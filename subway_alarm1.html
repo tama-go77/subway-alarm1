@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🚇 등교 지하철 알리미</title>
+<link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@300;400;500;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --red:#E8003D;--red-light:#ff3366;--bg:#0A0A0F;--surface:#12121A;
+  --surface2:#1A1A26;--surface3:#222232;--border:#2A2A3E;--border2:#363650;
+  --text:#F0F0FF;--text-dim:#6B6B8A;--text-mid:#A0A0C0;
+  --seven-light:#9AA800;--accent:#00D4FF;--warning:#FF8C00;
+  --green:#00C878;--yellow:#FFD700;
+  --ce:#00C878;--cn:#60C8FF;--cc:#FFD700;--cb:#FF8C00;--cj:#E8003D;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'Noto Sans KR',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%;
+  background:radial-gradient(ellipse at 30% 20%,rgba(232,0,61,.06) 0%,transparent 50%),
+             radial-gradient(ellipse at 70% 80%,rgba(0,212,255,.04) 0%,transparent 50%);
+  pointer-events:none;z-index:0;}
+.container{max-width:920px;margin:0 auto;padding:0 20px 60px;position:relative;z-index:1;}
+
+/* 헤더 */
+header{padding:36px 0 24px;border-bottom:1px solid var(--border);margin-bottom:28px;
+  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;}
+.logo-sub{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--red);letter-spacing:3px;text-transform:uppercase;margin-bottom:4px;}
+.logo-title{font-family:'Black Han Sans',sans-serif;font-size:28px;color:var(--text);line-height:1;}
+.logo-title span{color:var(--red);}
+#live-clock{font-family:'JetBrains Mono',monospace;font-size:32px;font-weight:700;color:var(--text);letter-spacing:2px;}
+#live-date{font-size:13px;color:var(--text-dim);margin-top:4px;font-family:'JetBrains Mono',monospace;}
+.clock-wrap{text-align:right;}
+
+/* 주간 그리드 */
+.week-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:24px;}
+.week-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 10px;
+  text-align:center;cursor:pointer;transition:all .2s;position:relative;}
+.week-card:hover{border-color:var(--border2);background:var(--surface2);}
+.week-card.today{border-color:var(--red);background:rgba(232,0,61,.07);}
+.week-card.viewing{border-color:var(--accent);background:rgba(0,212,255,.06);}
+.week-day{font-family:'Black Han Sans',sans-serif;font-size:16px;margin-bottom:4px;}
+.week-card.today .week-day{color:var(--red-light);}
+.week-card.viewing:not(.today) .week-day{color:var(--accent);}
+.week-class-time{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text-mid);font-weight:700;}
+.week-depart{font-size:11px;color:var(--text-dim);margin-top:3px;}
+/* 편집 버튼 (연필 아이콘) */
+.week-edit-btn{
+  position:absolute;top:6px;right:6px;width:18px;height:18px;
+  background:transparent;border:none;cursor:pointer;
+  color:var(--text-dim);font-size:11px;line-height:18px;text-align:center;
+  border-radius:4px;transition:all .2s;opacity:0;
+}
+.week-card:hover .week-edit-btn{opacity:1;}
+.week-edit-btn:hover{background:rgba(0,212,255,.15);color:var(--accent);}
+
+/* 오늘 카드 */
+.today-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;
+  padding:20px 24px;margin-bottom:20px;position:relative;overflow:hidden;}
+.today-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;
+  background:linear-gradient(90deg,var(--red),var(--accent));}
+.today-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;}
+.today-info{display:flex;align-items:center;gap:16px;}
+.day-badge{background:var(--red);color:white;font-family:'Black Han Sans',sans-serif;font-size:20px;padding:8px 16px;border-radius:8px;}
+.class-label{font-size:12px;color:var(--text-dim);letter-spacing:1px;}
+.class-time{font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:700;color:var(--yellow);}
+.class-time span{font-size:13px;color:var(--text-dim);margin-left:6px;font-family:'Noto Sans KR',sans-serif;}
+.route-display{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.route-tag{padding:4px 12px;border-radius:20px;font-size:13px;font-weight:500;}
+.route-tag.shin{background:rgba(232,0,61,.2);border:1px solid rgba(232,0,61,.5);color:#FF4477;}
+.route-tag.seven{background:rgba(116,127,0,.2);border:1px solid rgba(154,168,0,.5);color:var(--seven-light);}
+.route-arrow{color:var(--text-dim);font-size:14px;}
+.route-station{font-size:13px;color:var(--text-mid);}
+.source-tag{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;
+  background:rgba(0,212,255,.08);border:1px solid rgba(0,212,255,.2);border-radius:20px;
+  font-size:11px;color:var(--accent);font-family:'JetBrains Mono',monospace;margin-bottom:24px;}
+
+/* ════════════════════════════════════════
+   수업 시간표 편집 패널
+════════════════════════════════════════ */
+.schedule-panel{
+  background:var(--surface);border:1px solid var(--border2);border-radius:16px;
+  margin-bottom:24px;overflow:hidden;
+  transition:all .35s cubic-bezier(.4,0,.2,1);
+}
+.schedule-panel-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:16px 22px;cursor:pointer;user-select:none;
+  border-bottom:1px solid transparent;transition:border-color .2s;
+}
+.schedule-panel.open .schedule-panel-header{border-bottom-color:var(--border);}
+.panel-title{font-family:'Black Han Sans',sans-serif;font-size:16px;display:flex;align-items:center;gap:10px;}
+.panel-title-badge{
+  font-size:10px;font-family:'JetBrains Mono',monospace;font-weight:400;
+  padding:2px 8px;border-radius:10px;
+  background:rgba(0,212,255,.12);border:1px solid rgba(0,212,255,.25);color:var(--accent);
+  letter-spacing:.5px;
+}
+.panel-toggle{
+  display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-dim);
+  background:none;border:none;cursor:pointer;font-family:'Noto Sans KR',sans-serif;
+  transition:color .2s;
+}
+.panel-toggle:hover{color:var(--text);}
+.toggle-arrow{display:inline-block;transition:transform .3s;font-size:11px;}
+.schedule-panel.open .toggle-arrow{transform:rotate(180deg);}
+
+.schedule-body{
+  max-height:0;overflow:hidden;
+  transition:max-height .35s cubic-bezier(.4,0,.2,1);
+}
+.schedule-panel.open .schedule-body{max-height:400px;}
+
+.schedule-grid{
+  display:grid;grid-template-columns:repeat(5,1fr);gap:0;
+  padding:20px 22px;
+}
+.schedule-day-col{display:flex;flex-direction:column;align-items:center;gap:10px;}
+.sday-label{
+  font-family:'Black Han Sans',sans-serif;font-size:15px;
+  padding:5px 0;width:100%;text-align:center;
+}
+.sday-label.today-label{color:var(--red-light);}
+
+/* time input 스타일 */
+.time-input-wrap{position:relative;width:100%;}
+.time-input{
+  width:100%;background:var(--surface2);border:1px solid var(--border2);
+  border-radius:8px;padding:8px 6px 8px 8px;
+  font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;
+  color:var(--text);text-align:center;cursor:pointer;
+  transition:all .2s;outline:none;
+  -webkit-appearance:none;
+  /* 네이티브 시계 아이콘 숨기기 */
+}
+.time-input::-webkit-calendar-picker-indicator{
+  filter:invert(.4);cursor:pointer;width:14px;
+}
+.time-input:hover{border-color:var(--accent);background:var(--surface3);}
+.time-input:focus{border-color:var(--accent);background:var(--surface3);box-shadow:0 0 0 2px rgba(0,212,255,.15);}
+.time-input.no-class{
+  color:var(--text-dim);border-style:dashed;
+}
+.no-class-toggle{
+  font-size:11px;color:var(--text-dim);background:none;border:none;cursor:pointer;
+  font-family:'Noto Sans KR',sans-serif;text-decoration:underline;
+  transition:color .2s;padding:0;
+}
+.no-class-toggle:hover{color:var(--text-mid);}
+
+/* 저장 버튼 영역 */
+.schedule-actions{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 22px 18px;flex-wrap:wrap;gap:10px;
+}
+.btn-save{
+  background:var(--red);color:white;border:none;border-radius:8px;
+  padding:10px 24px;font-family:'Black Han Sans',sans-serif;font-size:15px;
+  cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:8px;
+}
+.btn-save:hover{background:var(--red-light);transform:translateY(-1px);}
+.btn-save:active{transform:translateY(0);}
+.btn-reset{
+  background:transparent;color:var(--text-dim);border:1px solid var(--border2);
+  border-radius:8px;padding:10px 18px;font-family:'Noto Sans KR',sans-serif;font-size:13px;
+  cursor:pointer;transition:all .2s;
+}
+.btn-reset:hover{border-color:var(--text-dim);color:var(--text);}
+.save-toast{
+  font-size:12px;color:var(--green);font-family:'JetBrains Mono',monospace;
+  opacity:0;transition:opacity .3s;
+}
+
+/* 혼잡도 */
+.cong-wrap{background:var(--surface);border:1px solid var(--border);border-radius:16px;
+  padding:20px 24px;margin-bottom:24px;position:relative;overflow:hidden;}
+.cong-wrap::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;
+  background:linear-gradient(90deg,var(--warning),var(--yellow));}
+.cong-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;}
+.cong-title{font-family:'Black Han Sans',sans-serif;font-size:17px;color:var(--text);display:flex;align-items:center;gap:8px;}
+.cong-src{font-size:11px;color:var(--text-dim);font-family:'JetBrains Mono',monospace;}
+.chart-outer{position:relative;}
+.chart-ylines{position:absolute;top:0;left:0;right:0;bottom:20px;pointer-events:none;}
+.chart-yline{position:absolute;left:0;right:0;height:1px;background:rgba(255,255,255,.05);}
+.chart-ylabel{position:absolute;right:100%;padding-right:6px;font-size:9px;color:var(--text-dim);
+  font-family:'JetBrains Mono',monospace;transform:translateY(50%);}
+.cong-chart-bg{display:flex;align-items:flex-end;gap:2px;height:100px;}
+.cong-bar-col{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;
+  cursor:pointer;position:relative;height:100%;}
+.cong-bar{width:100%;border-radius:3px 3px 0 0;transition:all .3s;min-height:3px;}
+.cong-bar-col:hover .cong-bar{filter:brightness(1.3);}
+.cong-bar-col.cur::after{content:'▼';position:absolute;top:-16px;font-size:10px;color:var(--accent);
+  animation:bounce 1s ease-in-out infinite;}
+@keyframes bounce{0%,100%{top:-16px}50%{top:-12px}}
+.cong-x-axis{display:flex;gap:2px;margin-top:4px;}
+.cong-x-label{flex:1;text-align:center;font-size:9px;color:var(--text-dim);font-family:'JetBrains Mono',monospace;}
+.cong-now-row{display:flex;align-items:center;gap:12px;margin-top:14px;flex-wrap:wrap;}
+.cong-badge{display:flex;align-items:center;gap:8px;padding:8px 16px;border-radius:10px;font-weight:700;font-size:15px;}
+.cong-desc{font-size:13px;color:var(--text-mid);line-height:1.6;}
+.cong-legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:12px;}
+.leg-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-mid);}
+.leg-dot{width:10px;height:10px;border-radius:2px;}
+
+/* 소요시간 */
+.tb-wrap{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:24px;
+  background:var(--surface);border-radius:12px;padding:14px 20px;border:1px solid var(--border);}
+.tb-item{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:70px;}
+.tb-line{font-size:10px;color:var(--text-dim);letter-spacing:.5px;}
+.tb-time{font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:var(--text);}
+.tb-arrow{color:var(--text-dim);font-size:16px;flex-shrink:0;}
+.tb-total{margin-left:auto;font-size:12px;color:var(--text-dim);font-family:'JetBrains Mono',monospace;}
+.tb-total strong{color:var(--yellow);font-size:15px;}
+
+/* 탭 */
+.tabs{display:flex;background:var(--surface);border-radius:12px;padding:4px;margin-bottom:20px;border:1px solid var(--border);}
+.tab-btn{flex:1;padding:10px 16px;background:transparent;border:none;color:var(--text-dim);
+  font-family:'Noto Sans KR',sans-serif;font-size:14px;font-weight:500;cursor:pointer;border-radius:8px;transition:all .2s;}
+.tab-btn.active{background:var(--surface2);color:var(--text);box-shadow:0 1px 4px rgba(0,0,0,.3);}
+.st-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px;background:var(--red);}
+
+/* 열차 카드 */
+.sec-head{display:flex;align-items:center;gap:12px;margin-bottom:14px;}
+.sec-line{width:4px;height:24px;border-radius:2px;background:var(--red);}
+.sec-title{font-family:'Black Han Sans',sans-serif;font-size:18px;color:var(--text);}
+.sec-desc{font-size:12px;color:var(--text-dim);margin-left:auto;font-family:'JetBrains Mono',monospace;}
+.train-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:10px;margin-bottom:24px;}
+.tc{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;
+  display:flex;flex-direction:column;gap:4px;transition:all .2s;position:relative;overflow:hidden;}
+.tc:hover{border-color:rgba(232,0,61,.4);transform:translateY(-1px);}
+.tc.next{border-color:var(--red);background:rgba(232,0,61,.08);}
+.tc.next::before{content:'NEXT';position:absolute;top:8px;right:8px;font-family:'JetBrains Mono',monospace;
+  font-size:9px;font-weight:700;color:var(--red);letter-spacing:1px;}
+.tc.rec{border-color:var(--green);background:rgba(0,200,120,.07);}
+.tc.rec::before{content:'✓ 추천';position:absolute;top:8px;right:8px;font-size:9px;font-weight:700;color:var(--green);}
+.tc.passed{opacity:.3;}
+.tc-time{font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:700;color:var(--text);}
+.tc.next .tc-time{color:var(--red-light);}
+.tc.rec .tc-time{color:var(--green);}
+.tc-arr{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);}
+.tc-rem{font-size:12px;color:var(--text-mid);font-weight:500;}
+.tc-rem.urgent{color:var(--warning);font-weight:700;}
+.tc-rem.ok{color:var(--green);}
+.cong-bar-mini{height:4px;border-radius:2px;background:var(--border);overflow:hidden;margin-top:5px;}
+.cong-fill{height:100%;border-radius:2px;transition:width .5s;}
+.cong-tag{font-size:10px;margin-top:2px;}
+.info-box{background:var(--surface);border:1px solid var(--border);border-radius:12px;
+  padding:16px 20px;margin-bottom:20px;font-size:13px;color:var(--text-mid);line-height:1.7;}
+.info-box strong{color:var(--accent);}
+.no-class-msg{text-align:center;padding:40px;color:var(--text-dim);}
+.no-class-msg .icon{font-size:40px;margin-bottom:12px;}
+.weekend-msg{text-align:center;padding:40px;color:var(--text-mid);font-size:15px;}
+
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.blink{animation:pulse 1.5s ease-in-out infinite;}
+.tooltip{position:fixed;background:var(--surface2);border:1px solid var(--border);border-radius:8px;
+  padding:8px 12px;font-size:12px;color:var(--text);pointer-events:none;z-index:100;
+  white-space:nowrap;font-family:'JetBrains Mono',monospace;transition:opacity .15s;}
+
+@keyframes slideIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+.panel-open-anim{animation:slideIn .25s ease-out;}
+
+@media(max-width:640px){
+  .train-grid{grid-template-columns:repeat(3,1fr);}
+  .week-grid{gap:5px;}
+  .week-card{padding:10px 6px;}
+  .week-day{font-size:14px;}
+  .week-class-time{font-size:11px;}
+  header{flex-direction:column;align-items:flex-start;}
+  .clock-wrap{text-align:left;}
+  #live-clock{font-size:24px;}
+  .today-row{flex-direction:column;align-items:flex-start;}
+  .tabs{display:grid;grid-template-columns:1fr 1fr;}
+  .schedule-grid{grid-template-columns:repeat(5,1fr);gap:0;padding:16px 12px;}
+  .time-input{font-size:11px;padding:6px 4px;}
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+<!-- 헤더 -->
+<header>
+  <div class="logo">
+    <div class="logo-sub">🚇 SUBWAY DEPARTURE TRACKER</div>
+    <div class="logo-title">등교 <span>지하철</span> 알리미</div>
+  </div>
+  <div class="clock-wrap">
+    <div id="live-clock">00:00:00</div>
+    <div id="live-date">로딩중...</div>
+  </div>
+</header>
+
+<!-- 주간 요약 그리드 -->
+<div class="week-grid" id="week-grid"></div>
+
+<!-- 오늘 카드 -->
+<div class="today-card">
+  <div class="today-row">
+    <div class="today-info">
+      <div class="day-badge" id="today-day">-</div>
+      <div>
+        <div class="class-label">첫 수업</div>
+        <div class="class-time" id="today-class-time">--:--</div>
+      </div>
+    </div>
+    <div class="route-display">
+      <div class="route-tag shin">신분당선</div>
+      <span class="route-arrow">→</span><span class="route-station">논현</span>
+      <span class="route-arrow">→</span>
+      <div class="route-tag seven">7호선</div>
+      <span class="route-arrow">→</span><span class="route-station">어린이대공원</span>
+    </div>
+  </div>
+</div>
+
+<!-- 출처 태그 -->
+<div class="source-tag">📡 시각표: DX LINE 공식(2025.4.21~) &nbsp;|&nbsp; 혼잡도: SK텔레콤 PUZZLE 통계 기반 추정</div>
+
+<!-- ════ 수업 시간표 편집 패널 ════ -->
+<div class="schedule-panel" id="schedule-panel">
+  <div class="schedule-panel-header" onclick="togglePanel()">
+    <div class="panel-title">
+      ✏️ 수업 시간표 편집
+      <span class="panel-title-badge">클릭하여 펼치기</span>
+    </div>
+    <button class="panel-toggle">
+      수정하기 <span class="toggle-arrow">▼</span>
+    </button>
+  </div>
+  <div class="schedule-body" id="schedule-body">
+    <div class="schedule-grid" id="schedule-grid"></div>
+    <div class="schedule-actions">
+      <div style="display:flex;gap:10px;align-items:center;">
+        <button class="btn-save" onclick="saveSchedule()">💾 저장하기</button>
+        <button class="btn-reset" onclick="resetSchedule()">기본값으로</button>
+      </div>
+      <div class="save-toast" id="save-toast">✓ 저장되었습니다!</div>
+    </div>
+  </div>
+</div>
+
+<!-- 혼잡도 섹션 -->
+<div class="cong-wrap">
+  <div class="cong-head">
+    <div class="cong-title">📊 신분당선 신사방향 혼잡도 <span id="cong-st-label" style="color:var(--accent);font-size:14px;">(수지구청역)</span></div>
+    <div class="cong-src">SK텔레콤 PUZZLE · 3개월 통계 기반</div>
+  </div>
+  <div class="chart-outer" style="padding-left:28px;">
+    <div class="chart-ylines" id="chart-ylines"></div>
+    <div class="cong-chart-bg" id="cong-chart"></div>
+  </div>
+  <div class="cong-x-axis" style="padding-left:28px;" id="cong-x-axis"></div>
+  <div class="cong-now-row">
+    <div class="cong-badge" id="cong-badge"><span id="cong-icon">—</span><span id="cong-label">계산 중...</span></div>
+    <div class="cong-desc" id="cong-desc"></div>
+  </div>
+  <div class="cong-legend">
+    <div class="leg-item"><div class="leg-dot" style="background:var(--ce)"></div>여유(~50%)</div>
+    <div class="leg-item"><div class="leg-dot" style="background:var(--cn)"></div>보통(50~80%)</div>
+    <div class="leg-item"><div class="leg-dot" style="background:var(--cc)"></div>주의(80~120%)</div>
+    <div class="leg-item"><div class="leg-dot" style="background:var(--cb)"></div>혼잡(120~150%)</div>
+    <div class="leg-item"><div class="leg-dot" style="background:var(--cj)"></div>매우혼잡(150%+)</div>
+  </div>
+</div>
+
+<!-- 소요시간 -->
+<div class="tb-wrap">
+  <div class="tb-item"><div class="tb-line">출발역</div><div class="tb-time" id="tb-dep">-</div></div>
+  <div class="tb-arrow">→</div>
+  <div class="tb-item"><div class="tb-line">신분당선</div><div class="tb-time" id="tb-shin">약 29분</div></div>
+  <div class="tb-arrow">→</div>
+  <div class="tb-item"><div class="tb-line">논현환승</div><div class="tb-time">약 5분</div></div>
+  <div class="tb-arrow">→</div>
+  <div class="tb-item"><div class="tb-line">7호선</div><div class="tb-time">약 28분</div></div>
+  <div class="tb-arrow">→</div>
+  <div class="tb-item"><div class="tb-line">어린이대공원</div><div class="tb-time">도착</div></div>
+  <div class="tb-total">총 소요 <strong id="tb-total">약 62분</strong></div>
+</div>
+
+<!-- 역 탭 -->
+<div class="tabs">
+  <button class="tab-btn active" onclick="selSt('sujiguucheong')" id="tab-su"><span class="st-dot"></span>수지구청역</button>
+  <button class="tab-btn" onclick="selSt('seongbok')" id="tab-se"><span class="st-dot"></span>성복역</button>
+</div>
+
+<!-- 열차 목록 -->
+<div id="train-section"></div>
+
+</div><!-- /container -->
+<div class="tooltip" id="tip" style="opacity:0;"></div>
+
+<script>
+// ══════════════════════════════════════════
+// 시각표 데이터 (DX LINE 공식, 2025.4.21~)
+// ══════════════════════════════════════════
+const SU={5:[42,54],6:[7,19,30,37,43,48,53,58],7:[3,7,12,17,22,27,31,36,41,46,51,55],8:[0,5,10,15,19,24,29,34,39,43,48,53,58],9:[3,7,12,18,25,32,39,47,55],10:[3,11,19,27,35,43,51,59],11:[7,15,23,31,39,47,55],12:[3,11,19,28,36,45,54],13:[2,11,19,28,37,45,54],14:[2,11,20,28,37,45,54],15:[3,11,20,28,37,46,54],16:[3,11,20,29,37,46,53],17:[3,7,12,17,22,27,31,36,41,46,51,55],18:[0,5,10,15,19,24,29,34,39,43,48,53,58],19:[3,7,12,17,22,27,31,36,41,47,53],20:[0,7,14,21,28,35,42,49,56],21:[3,10,18,26,34,41,48,55],22:[3,12,21,30,39,48,58],23:[9,21,33,45,57],0:[9]};
+const SE={5:[39,51],6:[4,16,27,35,41,46,50,55],7:[0,5,10,14,19,24,29,34,38,43,48,53,58],8:[2,7,12,17,22,26,31,36,41,46,50,55],9:[0,5,10,16,22,29,36,44,52],10:[0,8,16,24,32,40,48,56],11:[4,12,20,28,36,44,52],12:[0,8,17,25,34,42,51],13:[0,8,17,25,34,43,51],14:[0,8,17,26,34,43,51],15:[0,9,17,26,34,43,52],16:[0,9,17,26,35,43,50],17:[0,5,10,14,19,24,29,34,38,43,48,53,58],18:[2,7,12,17,22,26,31,36,41,46,50,55],19:[0,5,10,14,19,24,29,34,38,44,51,58],20:[5,12,19,26,33,40,47,54],21:[1,8,15,24,32,39,46,53],22:[1,9,18,27,36,45,55],23:[6,18,30,42,55],0:[7]};
+
+// ══════════════════════════════════════════
+// 혼잡도 데이터 (SK텔레콤 PUZZLE 통계 기반 추정)
+// ══════════════════════════════════════════
+const CONG={
+  sujiguucheong:{wd:[5,5,5,5,5,8,22,95,160,145,105,80,70,65,60,70,80,95,130,110,85,60,40,20],we:[5,5,5,5,5,5,15,40,55,65,70,75,80,75,70,65,70,80,85,75,60,45,30,15]},
+  seongbok:{wd:[5,5,5,5,5,8,20,88,150,135,100,75,65,60,55,65,75,90,125,105,80,55,38,18],we:[5,5,5,5,5,5,12,38,50,60,65,70,75,70,65,60,65,75,80,70,55,40,28,12]}
+};
+
+// ══════════════════════════════════════════
+// 수업 시간표 — 기본값 & 로컬스토리지 로드
+// ══════════════════════════════════════════
+const DEFAULT_CLS={
+  1:{t:'10:30',h:10,m:30},
+  2:{t:'15:00',h:15,m:0},
+  3:{t:'09:00',h:9,m:0},
+  4:{t:'10:30',h:10,m:30},
+  5:{t:'12:00',h:12,m:0}
+};
+
+// CLS는 항상 {t,h,m} 또는 null(수업없음)
+let CLS = loadSchedule();
+
+function loadSchedule(){
+  try{
+    const raw=localStorage.getItem('cls_schedule');
+    if(raw){
+      const parsed=JSON.parse(raw);
+      // 유효성 검사
+      const out={};
+      for(let d=1;d<=5;d++){
+        const v=parsed[d];
+        if(v===null){out[d]=null;}
+        else if(v&&typeof v.h==='number'&&typeof v.m==='number'){
+          out[d]={t:ft(v.h,v.m),h:v.h,m:v.m};
+        } else {
+          out[d]=DEFAULT_CLS[d];
+        }
+      }
+      return out;
+    }
+  }catch(e){}
+  return JSON.parse(JSON.stringify(DEFAULT_CLS));
+}
+
+function saveSchedule(){
+  // 인풋에서 값 읽기
+  for(let d=1;d<=5;d++){
+    const inp=document.getElementById(`time-inp-${d}`);
+    const noClassChk=document.getElementById(`no-class-${d}`);
+    if(!inp) continue;
+    if(noClassChk&&noClassChk.dataset.noclass==='1'){
+      CLS[d]=null;
+    } else {
+      const val=inp.value; // "HH:MM"
+      if(val){
+        const [hh,mm]=val.split(':').map(Number);
+        CLS[d]={t:val,h:hh,m:mm};
+      }
+    }
+  }
+  try{ localStorage.setItem('cls_schedule',JSON.stringify(CLS)); }catch(e){}
+  // 토스트
+  const toast=document.getElementById('save-toast');
+  toast.style.opacity='1';
+  setTimeout(()=>toast.style.opacity='0',2000);
+  // 전체 리렌더
+  renderWeek();
+  updateToday();
+  renderTrains();
+  renderChart(ST,VD!==null?VD:new Date().getDay());
+}
+
+function resetSchedule(){
+  if(!confirm('기본 시간표로 초기화할까요?')) return;
+  CLS=JSON.parse(JSON.stringify(DEFAULT_CLS));
+  try{ localStorage.removeItem('cls_schedule'); }catch(e){}
+  renderScheduleInputs();
+  renderWeek();
+  updateToday();
+  renderTrains();
+}
+
+// ══════════════════════════════════════════
+// 수업 편집 패널 렌더
+// ══════════════════════════════════════════
+const DN=['일','월','화','수','목','금','토'];
+const TRV={sujiguucheong:29,seongbok:31};
+const TR=33;
+let ST='sujiguucheong', VD=null;
+const tip=document.getElementById('tip');
+
+function togglePanel(){
+  const panel=document.getElementById('schedule-panel');
+  const isOpen=panel.classList.contains('open');
+  panel.classList.toggle('open');
+  const badge=panel.querySelector('.panel-title-badge');
+  badge.textContent=isOpen?'클릭하여 펼치기':'클릭하여 접기';
+  if(!isOpen) renderScheduleInputs();
+}
+
+function renderScheduleInputs(){
+  const todayDow=new Date().getDay();
+  let html='';
+  for(let d=1;d<=5;d++){
+    const cls=CLS[d];
+    const isToday=(d===todayDow);
+    const isNoClass=(cls===null);
+    const val=isNoClass?'':(cls.t||ft(cls.h,cls.m));
+    html+=`
+    <div class="schedule-day-col">
+      <div class="sday-label${isToday?' today-label':''}">${DN[d]}</div>
+      <input
+        type="time"
+        id="time-inp-${d}"
+        class="time-input${isNoClass?' no-class':''}"
+        value="${isNoClass?'':val}"
+        ${isNoClass?'disabled':''}
+        oninput="onTimeChange(${d})"
+        title="${DN[d]}요일 첫 수업 시간"
+      >
+      <button
+        class="no-class-toggle"
+        id="no-class-${d}"
+        data-noclass="${isNoClass?'1':'0'}"
+        onclick="toggleNoClass(${d})"
+        title="수업 없는 날로 설정"
+      >${isNoClass?'+ 추가':'수업 없음'}</button>
+    </div>`;
+  }
+  document.getElementById('schedule-grid').innerHTML=html;
+}
+
+function onTimeChange(d){
+  // 실시간 반영 (저장 전 미리보기)
+  const inp=document.getElementById(`time-inp-${d}`);
+  if(inp&&inp.value){
+    const [hh,mm]=inp.value.split(':').map(Number);
+    CLS[d]={t:inp.value,h:hh,m:mm};
+    renderWeek();
+    updateToday();
+    renderTrains();
+  }
+}
+
+function toggleNoClass(d){
+  const btn=document.getElementById(`no-class-${d}`);
+  const inp=document.getElementById(`time-inp-${d}`);
+  if(!btn||!inp) return;
+  const isNoClass=btn.dataset.noclass==='1';
+  if(isNoClass){
+    // 수업 있음으로 전환 → 기본값 복원
+    const def=DEFAULT_CLS[d];
+    CLS[d]=def;
+    inp.value=def.t;
+    inp.disabled=false;
+    inp.classList.remove('no-class');
+    btn.dataset.noclass='0';
+    btn.textContent='수업 없음';
+  } else {
+    // 수업 없음으로 전환
+    CLS[d]=null;
+    inp.value='';
+    inp.disabled=true;
+    inp.classList.add('no-class');
+    btn.dataset.noclass='1';
+    btn.textContent='+ 추가';
+  }
+  renderWeek();
+  updateToday();
+  renderTrains();
+}
+
+// ══════════════════════════════════════════
+// 헬퍼
+// ══════════════════════════════════════════
+const toM=(h,m)=>h*60+m;
+const ft=(h,m)=>`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+function fmtR(d){
+  if(d<=0)return '출발';
+  if(d<60)return `${d}분 후`;
+  const h=Math.floor(d/60),m=d%60;
+  return m===0?`${h}시간 후`:`${h}시간 ${m}분 후`;
+}
+function getWin(ch,cm,st){
+  const ct=toM(ch,cm),tv=TRV[st]+TR;
+  return{ea:ct-120,la:ct-tv-5};
+}
+function getCong(st,h,we){
+  const d=CONG[st];return(we?d.we:d.wd)[Math.min(h,23)]||0;
+}
+function cLv(p){
+  if(p<50) return{l:'여유',    c:'var(--ce)',tc:'#00C878',i:'🟢',d:'여유롭게 탑승 가능해요.'};
+  if(p<80) return{l:'보통',    c:'var(--cn)',tc:'#60C8FF',i:'🔵',d:'약간 붐빌 수 있어요.'};
+  if(p<120)return{l:'주의',    c:'var(--cc)',tc:'#FFD700',i:'🟡',d:'혼잡합니다. 다음 열차도 고려해보세요.'};
+  if(p<150)return{l:'혼잡',    c:'var(--cb)',tc:'#FF8C00',i:'🟠',d:'많이 붐빕니다. 입석 각오하세요!'};
+  return    {l:'매우 혼잡',c:'var(--cj)',tc:'#E8003D',i:'🔴',d:'극혼잡! 가능하면 다음 열차를 타세요.'};
+}
+
+function getTrains(st,ch,cm){
+  const sc=st==='sujiguucheong'?SU:SE;
+  const{ea,la}=getWin(ch,cm,st),tv=TRV[st]+TR;
+  let out=[];
+  for(let h=0;h<=23;h++) for(const m of(sc[h]||[])){
+    const dep=toM(h,m);
+    if(dep>=ea&&dep<=la){
+      const arr=dep+tv;
+      out.push({dh:h,dm:m,dmin:dep,amin:arr,astr:ft(Math.floor(arr/60)%24,arr%60),mg:toM(ch,cm)-arr});
+    }
+  }
+  return out;
+}
+
+// ══════════════════════════════════════════
+// 혼잡도 차트
+// ══════════════════════════════════════════
+function renderChart(st,dow){
+  const we=(dow===0||dow===6);
+  const now=new Date(),curH=now.getHours();
+  const hrs=[];for(let h=5;h<=23;h++)hrs.push(h);
+  const d=CONG[st],arr=we?d.we:d.wd;
+  const maxV=Math.max(...hrs.map(h=>arr[h]||0),160);
+  let ylHtml='';
+  [50,100,150].forEach(v=>{
+    const bot=Math.round(v/maxV*100);
+    ylHtml+=`<div class="chart-yline" style="bottom:calc(${bot}% + 20px)"><span class="chart-ylabel">${v}%</span></div>`;
+  });
+  document.getElementById('chart-ylines').innerHTML=ylHtml;
+  let ch='',xh='';
+  hrs.forEach(h=>{
+    const p=arr[h]||0,bh=Math.max(3,Math.round(p/maxV*100));
+    const lv=cLv(p),isCur=(h===curH&&!we);
+    ch+=`<div class="cong-bar-col${isCur?' cur':''}" onmouseenter="showTip(event,${h},${p})" onmouseleave="hideTip()">
+      <div class="cong-bar" style="height:${bh}%;background:${lv.c};"></div></div>`;
+    xh+=`<div class="cong-x-label">${h}</div>`;
+  });
+  document.getElementById('cong-chart').innerHTML=ch;
+  document.getElementById('cong-x-axis').innerHTML=xh;
+  document.getElementById('cong-st-label').textContent=`(${st==='sujiguucheong'?'수지구청역':'성복역'})`;
+  const nowP=arr[curH]||0,lv=cLv(nowP);
+  const badge=document.getElementById('cong-badge');
+  badge.style.cssText=`background:${lv.c}22;border:1px solid ${lv.c}55;color:${lv.tc};`;
+  document.getElementById('cong-icon').textContent=lv.i;
+  document.getElementById('cong-label').textContent=`현재 ${curH}시대 · ${lv.l} · 약 ${nowP}%`;
+  document.getElementById('cong-desc').innerHTML=
+    `<strong style="color:${lv.tc}">${lv.d}</strong><br>`+
+    `<span style="font-size:11px;color:var(--text-dim)">※ SK텔레콤 PUZZLE 최근 3개월 통계 기반 예측 (실시간 아님)</span>`;
+}
+function showTip(e,h,p){
+  const lv=cLv(p);
+  tip.style.opacity='1';
+  tip.innerHTML=`${h}시대 &nbsp;<span style="color:${lv.tc}">${lv.l} (${p}%)</span>`;
+  tip.style.left=(e.clientX+12)+'px';tip.style.top=(e.clientY-36)+'px';
+}
+function hideTip(){tip.style.opacity='0';}
+
+// ══════════════════════════════════════════
+// 주간 그리드
+// ══════════════════════════════════════════
+function renderWeek(){
+  const todayDow=new Date().getDay();
+  let h='';
+  for(let d=1;d<=5;d++){
+    const cls=CLS[d];
+    const isToday=(d===todayDow);
+    const isViewing=(VD===d);
+    let timeStr='수업 없음',departStr='-';
+    if(cls){
+      timeStr=cls.t||ft(cls.h,cls.m);
+      const{la}=getWin(cls.h,cls.m,'sujiguucheong');
+      departStr=`~${ft(Math.floor(la/60),la%60)}`;
+    }
+    h+=`<div class="week-card${isToday?' today':''}${isViewing&&!isToday?' viewing':''}" onclick="selDay(${d})">
+      <button class="week-edit-btn" onclick="event.stopPropagation();openPanelForDay(${d})" title="시간 수정">✏️</button>
+      <div class="week-day">${DN[d]}</div>
+      <div class="week-class-time" style="${!cls?'color:var(--text-dim);':''}">${timeStr}</div>
+      <div class="week-depart">${departStr}</div>
+    </div>`;
+  }
+  document.getElementById('week-grid').innerHTML=h;
+}
+
+function selDay(d){
+  VD=d;
+  renderWeek(); // 선택 강조 업데이트
+  renderTrains();
+  renderChart(ST,d);
+}
+
+function openPanelForDay(d){
+  const panel=document.getElementById('schedule-panel');
+  if(!panel.classList.contains('open')){
+    panel.classList.add('open');
+    const badge=panel.querySelector('.panel-title-badge');
+    badge.textContent='클릭하여 접기';
+    renderScheduleInputs();
+  }
+  // 해당 요일 인풋으로 포커스
+  setTimeout(()=>{
+    const inp=document.getElementById(`time-inp-${d}`);
+    if(inp&&!inp.disabled){
+      inp.focus();
+      inp.showPicker&&inp.showPicker();
+    }
+  },350);
+}
+
+// ══════════════════════════════════════════
+// 오늘 카드
+// ══════════════════════════════════════════
+function updateToday(){
+  const now=new Date(),dw=now.getDay();
+  document.getElementById('today-day').textContent=DN[dw]+(dw>0&&dw<6?'요일':'');
+  const ct=document.getElementById('today-class-time');
+  if(dw===0||dw===6){ct.innerHTML='주말<span>수업 없음</span>';return;}
+  const cls=CLS[dw];
+  if(!cls){ct.innerHTML='수업 없음<span> — 쉬는 날!</span>';return;}
+  const diff=toM(cls.h,cls.m)-toM(now.getHours(),now.getMinutes());
+  ct.innerHTML=`${cls.t}<span>${diff>0?` / ${fmtR(diff)} 후 수업`:' / 수업 시작됨'}</span>`;
+}
+
+// ══════════════════════════════════════════
+// 열차 목록
+// ══════════════════════════════════════════
+function renderTrains(){
+  const now=new Date(),todayDow=now.getDay();
+  const vd=VD!==null?VD:(todayDow>=1&&todayDow<=5?todayDow:1);
+
+  if(vd===0||vd===6){
+    document.getElementById('train-section').innerHTML=
+      `<div class="weekend-msg"><div style="font-size:40px;margin-bottom:16px;">🌿</div>
+      <p>오늘은 <strong style="color:var(--green)">${DN[vd]}요일</strong>이에요. 푹 쉬세요!</p></div>`;
+    return;
+  }
+
+  const cls=CLS[vd];
+  if(!cls){
+    document.getElementById('train-section').innerHTML=
+      `<div class="no-class-msg">
+        <div class="icon">😴</div>
+        <p style="font-size:16px;color:var(--text-mid);margin-bottom:8px;">${DN[vd]}요일은 수업이 없어요.</p>
+        <p style="font-size:13px;color:var(--text-dim)">수업 시간표 편집에서 수업을 추가할 수 있어요.</p>
+      </div>`;
+    document.getElementById('tb-dep').textContent=ST==='sujiguucheong'?'수지구청역':'성복역';
+    return;
+  }
+
+  const trains=getTrains(ST,cls.h,cls.m);
+  const nm=toM(now.getHours(),now.getMinutes()),isToday=(vd===todayDow);
+  const tv=TRV[ST],stNm=ST==='sujiguucheong'?'수지구청역':'성복역';
+  const isWe=false;
+
+  document.getElementById('tb-dep').textContent=stNm;
+  document.getElementById('tb-shin').textContent=`약 ${tv}분`;
+  document.getElementById('tb-total').textContent=`약 ${tv+TR}분`;
+
+  let ni=-1;
+  if(isToday) for(let i=0;i<trains.length;i++){if(trains[i].dmin>=nm){ni=i;break;}}
+
+  let g='';
+  if(!trains.length){
+    g=`<div style="color:var(--text-dim);padding:20px;font-size:14px;">해당 시간대 열차가 없습니다.</div>`;
+  } else {
+    trains.forEach((t,i)=>{
+      const ip=isToday&&t.dmin<nm,isn=isToday&&i===ni,ir=!ip&&t.mg>=10&&t.mg<=25;
+      let tcls='tc';
+      if(ip)tcls+=' passed';else if(isn)tcls+=' next';else if(ir)tcls+=' rec';
+      let rem='',rc='';
+      if(isToday){
+        const df=t.dmin-nm;
+        if(ip)rem='지남';
+        else if(df<=0){rem='지금 출발';rc='urgent blink';}
+        else if(df<=5){rem=`${df}분 후 ⚡`;rc='urgent';}
+        else if(df<=15){rem=`${df}분 후`;rc='urgent';}
+        else{rem=fmtR(df);rc=df<=30?'':'ok';}
+      } else {rem=`수업 ${t.mg}분 전 도착`;rc=t.mg>=15?'ok':'';}
+      const cp=getCong(ST,t.dh,isWe),clv=cLv(cp);
+      const bw=Math.min(100,Math.round(cp/160*100));
+      g+=`<div class="${tcls}">
+        <div class="tc-time">${ft(t.dh,t.dm)}</div>
+        <div class="tc-arr">도착 ${t.astr}</div>
+        <div class="tc-rem ${rc}">${rem}</div>
+        <div class="cong-bar-mini"><div class="cong-fill" style="width:${bw}%;background:${clv.c}"></div></div>
+        <div class="cong-tag" style="color:${clv.tc}">${clv.i} ${clv.l} · ${cp}%</div>
+      </div>`;
+    });
+  }
+
+  const{la}=getWin(cls.h,cls.m,ST);
+  document.getElementById('train-section').innerHTML=`
+    <div class="sec-head">
+      <div class="sec-line"></div>
+      <div class="sec-title">${stNm} 신사행 출발 시각</div>
+      <div class="sec-desc">수업 ${cls.t} 기준</div>
+    </div>
+    <div class="train-grid">${g}</div>
+    <div class="info-box">
+      <strong>📌 ${cls.t} 수업 기준</strong> — 총 소요시간 약 ${tv+TR}분<br>
+      ${stNm} 최소 <strong>${ft(Math.floor(la/60),la%60)}</strong> 이전 출발 권장 (5분 여유 포함)<br>
+      논현역 7호선 환승 → <strong>어린이대공원역</strong> 하차 (약 28분, 환승 5분)<br>
+      <span style="font-size:12px;color:var(--text-dim)">🚦 열차 카드 하단 바: 해당 시간대 추정 혼잡도 (SK PUZZLE 3개월 통계 기반)</span>
+    </div>`;
+}
+
+function selSt(st){
+  ST=st;
+  document.getElementById('tab-su').classList.toggle('active',st==='sujiguucheong');
+  document.getElementById('tab-se').classList.toggle('active',st==='seongbok');
+  const d=VD!==null?VD:new Date().getDay();
+  renderChart(st,d);renderTrains();
+}
+
+function updateClock(){
+  const n=new Date(),p=x=>String(x).padStart(2,'0');
+  document.getElementById('live-clock').textContent=`${p(n.getHours())}:${p(n.getMinutes())}:${p(n.getSeconds())}`;
+  document.getElementById('live-date').textContent=`${n.getFullYear()}.${p(n.getMonth()+1)}.${p(n.getDate())} (${DN[n.getDay()]})`;
+}
+function tick(){updateClock();updateToday();renderTrains();}
+
+// ══════════════════════════════════════════
+// 초기화
+// ══════════════════════════════════════════
+renderWeek();
+VD=(()=>{const d=new Date().getDay();return(d>=1&&d<=5)?d:1;})();
+renderChart(ST,VD);
+tick();
+setInterval(tick,1000);
+</script>
+</body>
+</html>
